@@ -25,6 +25,64 @@ class Extractor(nn.Module):
 
     def __init__(self):
         super(Extractor, self).__init__()
+        self.conv1 = nn.Conv2d(4, 300, kernel_size=(1,19))
+        self.conv2 = nn.Conv2d(300, 200, kernel_size=(1,11))
+        self.conv3 = nn.Conv2d(200, 200, kernel_size=(1,7))
+        self.bn1 = nn.BatchNorm2d(300)
+        self.bn2 = nn.BatchNorm2d(200)
+
+    def forward(self, input):
+        input = input.expand(input.data.shape[0], 4, 1, 1000)
+        x = F.relu(F.max_pool2d(self.bn1(self.conv1(input)), (1,3)))
+        x = F.relu(F.max_pool2d(self.bn2(self.conv2(x)), (1,4)))
+        x = F.relu(F.max_pool2d(self.bn2(self.conv3(x)), (1,4)))
+        x = x.view(-1, 3600)
+
+        return x
+
+class Class_classifier(nn.Module):
+
+    def __init__(self):
+        super(Class_classifier, self).__init__()
+        self.fc1 = nn.Linear(3600, 1000)
+        self.fc2 = nn.Linear(1000, 1000)
+        self.fc3 = nn.Linear(1000, 2)
+        self.bn1 = nn.BatchNorm1d(1000)
+        self.dropout = nn.Dropout(p=0.3)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input):
+        logits = F.relu(self.bn1(self.fc1(input)))
+        logits = F.relu(self.bn1(self.fc2(self.dropout(logits))))
+        logits = self.fc3(self.dropout(logits))
+
+        #return F.log_softmax(logits, 1)
+        return self.sigmoid(logits)
+
+class Domain_classifier(nn.Module):
+
+    def __init__(self):
+        super(Domain_classifier, self).__init__()
+        self.fc1 = nn.Linear(3600, 1000)
+        self.fc2 = nn.Linear(1000, 1000)
+        self.fc3 = nn.Linear(1000, 2)
+        self.bn1 = nn.BatchNorm1d(1000)
+        self.dropout = nn.Dropout(p=0.3)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input, constant):
+        input = GradReverse.grad_reverse(input, constant)
+        logits = F.relu(self.bn1(self.fc1(input)))
+        logits = F.relu(self.bn1(self.fc2(self.dropout(logits))))
+        logits = self.fc3(self.dropout(logits))
+
+        #return F.log_softmax(logits, 1)
+        return self.sigmoid(logits)
+
+class Img_Extractor(nn.Module):
+
+    def __init__(self):
+        super(Img_Extractor, self).__init__()
         self.conv1 = nn.Conv2d(3, 32, kernel_size=5)
         self.conv2 = nn.Conv2d(32, 48, kernel_size=5)
         # self.conv1 = nn.Conv2d(3, 64, kernel_size= 5)
@@ -40,14 +98,16 @@ class Extractor(nn.Module):
         # x = x.view(-1, 50 * 4 * 4)
         x = F.relu(F.max_pool2d(self.conv1(input), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
+        print(x.shape)
         x = x.view(-1, 48 * 4 * 4)
+        print(x.shape)
 
         return x
 
-class Class_classifier(nn.Module):
+class Img_Class_classifier(nn.Module):
 
     def __init__(self):
-        super(Class_classifier, self).__init__()
+        super(Img_Class_classifier, self).__init__()
         # self.fc1 = nn.Linear(50 * 4 * 4, 100)
         # self.bn1 = nn.BatchNorm1d(100)
         # self.fc2 = nn.Linear(100, 100)
@@ -62,6 +122,7 @@ class Class_classifier(nn.Module):
         # logits = self.fc2(F.dropout(logits))
         # logits = F.relu(self.bn2(logits))
         # logits = self.fc3(logits)
+        print(input.shape)
         logits = F.relu(self.fc1(input))
         logits = self.fc2(F.dropout(logits))
         logits = F.relu(logits)
@@ -69,10 +130,10 @@ class Class_classifier(nn.Module):
 
         return F.log_softmax(logits, 1)
 
-class Domain_classifier(nn.Module):
+class Img_Domain_classifier(nn.Module):
 
     def __init__(self):
-        super(Domain_classifier, self).__init__()
+        super(Img_Domain_classifier, self).__init__()
         # self.fc1 = nn.Linear(50 * 4 * 4, 100)
         # self.bn1 = nn.BatchNorm1d(100)
         # self.fc2 = nn.Linear(100, 2)
@@ -87,8 +148,6 @@ class Domain_classifier(nn.Module):
         logits = F.log_softmax(self.fc2(logits), 1)
 
         return logits
-
-
 
 class SVHN_Extractor(nn.Module):
 

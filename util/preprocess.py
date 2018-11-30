@@ -1,10 +1,10 @@
 import os, shutil
 
-data_dir = './data/MNIST_M'
-train_labels = './data/MNIST_M/mnist_m_train_labels.txt'
-test_labels = './data/MNIST_M/mnist_m_test_labels.txt'
-train_images = './data/MNIST_M/mnist_m_train'
-test_images = './data/MNIST_M/mnist_m_test'
+data_dir = '../data/MNIST_M'
+train_labels = '../data/MNIST_M/mnist_m_train_labels.txt'
+test_labels = '../data/MNIST_M/mnist_m_test_labels.txt'
+train_images = '../data/MNIST_M/mnist_m_train'
+test_images = '../data/MNIST_M/mnist_m_test'
 
 def mkdirs(path):
     train_dir = path + '/' + 'train'
@@ -29,5 +29,5 @@ def process(labels_path, images_path, data_dir):
 mkdirs(data_dir)
 process(train_labels, train_images, data_dir + '/train')
 process(test_labels, test_images, data_dir + '/test')
-os.remove(train_images)
-os.remove(test_images)
+os.rmdir(train_images)
+os.rmdir(test_images)

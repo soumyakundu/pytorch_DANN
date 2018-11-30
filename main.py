@@ -155,8 +155,11 @@ def main(args):
         domain_classifier.cuda()
 
     # init criterions
-    class_criterion = nn.NLLLoss()
-    domain_criterion = nn.NLLLoss()
+    #class_criterion = nn.NLLLoss()
+    #domain_criterion = nn.NLLLoss()
+
+    class_criterion = nn.CrossEntropyLoss()
+    domain_criterion = nn.CrossEntropyLoss()
 
     # init optimizer
     optimizer = optim.SGD([{'params': feature_extractor.parameters()},
@@ -181,9 +184,9 @@ def parse_arguments(argv):
     """Command line parse."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--source_domain', type= str, default= 'MNIST', help= 'Choose source domain.')
+    parser.add_argument('--source_domain', type= str, default= 'Human', help= 'Choose source domain.')
 
-    parser.add_argument('--target_domain', type= str, default= 'MNIST_M', help = 'Choose target domain.')
+    parser.add_argument('--target_domain', type= str, default= 'Mouse', help = 'Choose target domain.')
 
     parser.add_argument('--fig_mode', type=str, default=None, help='Plot experiment figures.')
 

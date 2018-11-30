@@ -12,7 +12,7 @@ plt.switch_backend('agg')
 
 import numpy as np
 import os, time
-from data import SynDig
+from data import SynDig, Human, Mouse
 
 
 def get_train_loader(dataset):
@@ -63,10 +63,19 @@ def get_train_loader(dataset):
             transforms.Normalize(mean= params.dataset_mean, std= params.dataset_std)
         ])
 
-        data = SynDig.SynDig(root= params.syndig_path, split= 'train', transform= transform, download= False)
+        data = SynDig.SynDig(root= params.syndig_path, split= 'train', transform= transform, download= True)
 
         dataloader = DataLoader(dataset = data, batch_size= params.batch_size, shuffle= True)
 
+    elif dataset == 'Human':
+
+        data = Human.Human(split = 'train')
+        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+
+    elif dataset == 'Mouse':
+
+        data = Mouse.Mouse(split = 'train')
+        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
 
     else:
         raise Exception('There is no dataset named {}'.format(str(dataset)))
@@ -118,9 +127,20 @@ def get_test_loader(dataset):
             transforms.Normalize(mean=params.dataset_mean, std=params.dataset_std)
         ])
 
-        data = SynDig.SynDig(root= params.syndig_path, split= 'test', transform= transform, download= False)
+        data = SynDig.SynDig(root= params.syndig_path, split= 'test', transform= transform, download= True)
 
         dataloader = DataLoader(dataset= data, batch_size= params.batch_size, shuffle= True)
+
+    elif dataset == 'Human':
+
+        data = Human.Human(split = 'test')
+        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+
+    elif dataset == 'Mouse':
+
+        data = Mouse.Mouse(split = 'test')
+        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+
     else:
         raise Exception('There is no dataset named {}'.format(str(dataset)))
 

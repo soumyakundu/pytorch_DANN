@@ -43,6 +43,14 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
             # prepare the data
             input1, label1 = sdata
             input2, label2 = tdata
+            label1 = torch.squeeze(label1)
+            label2 = torch.squeeze(label2)
+            label1 = label1.type(torch.LongTensor)
+            label2 = label2.type(torch.LongTensor)
+            input1 = input1.type(torch.FloatTensor)
+            input2 = input2.type(torch.FloatTensor)
+            #print(input1.type())
+            #print(input2.type())
             size = min((input1.shape[0], input2.shape[0]))
             input1, label1 = input1[0:size, :, :, :], label1[0:size]
             input2, label2 = input2[0:size, :, :, :], label2[0:size]
@@ -64,6 +72,9 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
             else:
                 source_labels = Variable(torch.zeros((input1.size()[0])).type(torch.LongTensor))
                 target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
+
+            #print(input1.type())
+            #print(input2.type())
 
             # compute the output of source domain and target domain
             src_feature = feature_extractor(input1)
