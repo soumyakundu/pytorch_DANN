@@ -115,6 +115,9 @@ def main(args):
     # Set global parameters.
     params.fig_mode = args.fig_mode
     params.epochs = args.max_epoch
+    params.num_train = args.num_train
+    params.num_test = args.num_test
+    params.upsample = args.upsample
     params.training_mode = args.training_mode
     params.source_domain = args.source_domain
     params.target_domain = args.target_domain
@@ -125,8 +128,10 @@ def main(args):
 
     if args.save_dir is not None:
         params.save_dir = args.save_dir
-    else:
-        print('Figures will be saved in ./experiment folder.')
+    #else:
+        #print('Figures will be saved in ./experiment folder.')
+
+    print("Starting up")
 
     # prepare the source data and target data
 
@@ -185,20 +190,16 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--source_domain', type= str, default= 'Human', help= 'Choose source domain.')
-
     parser.add_argument('--target_domain', type= str, default= 'Mouse', help = 'Choose target domain.')
-
     parser.add_argument('--fig_mode', type=str, default=None, help='Plot experiment figures.')
-
     parser.add_argument('--save_dir', type=str, default=None, help='Path to save plotted images.')
-
     parser.add_argument('--training_mode', type=str, default='dann', help='Choose a mode to train the model.')
-
     parser.add_argument('--max_epoch', type=int, default=100, help='The max number of epochs.')
-
     parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
-
-    parser.add_argument('--lr', type= float, default= 0.01, help= 'Learning rate.')
+    parser.add_argument('--lr', type= float, default= 0.001, help= 'Learning rate.')
+    parser.add_argument('--upsample', type=int, default=5, help='Set frequency of sampling positive training example.')
+    parser.add_argument('--num_train', type=int, default=100000, help='Number of training examples per epoch.')
+    parser.add_argument('--num_test', type=int, default=50000, help='Number of testing examples per epoch.')
 
     return parser.parse_args()
 

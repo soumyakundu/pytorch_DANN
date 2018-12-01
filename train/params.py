@@ -11,6 +11,9 @@ dataset_std = (0.5, 0.5, 0.5)
 
 batch_size = 512
 epochs = 1000
+num_train = 100000
+num_test = 50000
+upsample = 5
 gamma = 10
 theta = 1
 

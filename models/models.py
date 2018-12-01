@@ -98,9 +98,7 @@ class Img_Extractor(nn.Module):
         # x = x.view(-1, 50 * 4 * 4)
         x = F.relu(F.max_pool2d(self.conv1(input), 2))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 2))
-        print(x.shape)
         x = x.view(-1, 48 * 4 * 4)
-        print(x.shape)
 
         return x
 
@@ -122,7 +120,6 @@ class Img_Class_classifier(nn.Module):
         # logits = self.fc2(F.dropout(logits))
         # logits = F.relu(self.bn2(logits))
         # logits = self.fc3(logits)
-        print(input.shape)
         logits = F.relu(self.fc1(input))
         logits = self.fc2(F.dropout(logits))
         logits = F.relu(logits)
