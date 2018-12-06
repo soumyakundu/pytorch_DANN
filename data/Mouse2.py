@@ -17,7 +17,6 @@ class Mouse(Dataset):
         self.transform = transform
         self.upsample = upsample
         self.epoch_size = epoch_size
-        self.validate = True
 
         if self.split not in self.split_list:
             raise ValueError('Wrong split entered! Please use split="train" '
@@ -47,14 +46,24 @@ class Mouse(Dataset):
 
     def __getitem__(self, index):
 
-        if self.validate == True:
+        valid = False
+        bad = 'N' * 800
+        bad2 = 'n' * 800
 
-            if self.split == 'test':
-                self.upsample = 10
+        if self.split == 'train':
 
             if index % self.upsample == 0:
-                entry = self.ones.index[self.pos_num_gen]
-                seq = self.ref.fetch(entry[0], entry[1], entry[2])
+
+                while valid is False:
+                    entry = self.ones.index[self.pos_num_gen]
+                    seq = self.ref.fetch(entry[0], entry[1], entry[2])
+                    if ((bad not in seq) and (bad2 not in seq)):
+                        valid = True
+                    else:
+                        self.pos_num_gen += 1
+                        print("bad")
+                        print(seq)
+
                 onehot = np.array([self.ltrdict.get(x,[0,0,0,0]) for x in seq])
                 label = self.ones[self.pos_num_gen:(self.pos_num_gen + 1)]
                 label = np.asarray(label)
@@ -62,13 +71,21 @@ class Mouse(Dataset):
                 self.pos_num_gen += 1
                 if self.pos_num_gen == self.pos_total:
                     self.pos_num_gen = 0
-                onehot = torch.tensor(onehot).type(torch.FloatTensor)
+                onehot = torch.tensor(onehot)
                 onehot = onehot.view(4, 1, 1000)
-                label = torch.tensor(label).type(torch.FloatTensor)
 
             else:
-                entry = self.zeros.index[self.neg_num_gen]
-                seq = self.ref.fetch(entry[0], entry[1], entry[2])
+
+                while valid is False:
+                    entry = self.ones.index[self.neg_num_gen]
+                    seq = self.ref.fetch(entry[0], entry[1], entry[2])
+                    if ((bad not in seq) and (bad2 not in seq)):
+                        valid = True
+                    else:
+                        self.neg_num_gen += 1
+                        print("bad")
+                        print(seq)
+
                 onehot = np.array([self.ltrdict.get(x,[0,0,0,0]) for x in seq])
                 label = self.zeros[self.neg_num_gen:(self.neg_num_gen + 1)]
                 label = np.asarray(label)
@@ -76,11 +93,20 @@ class Mouse(Dataset):
                 self.neg_num_gen += 1
                 if self.neg_num_gen == self.neg_total:
                     self.neg_num_gen = 0
-                onehot = torch.tensor(onehot).type(torch.FloatTensor)
+                onehot = torch.tensor(onehot)
                 onehot = onehot.view(4, 1, 1000)
-                label = torch.tensor(label).type(torch.FloatTensor)
 
         else:
+
+            while valid is False:
+                entry = self.ones.index[self.num_gen]
+                seq = self.ref.fetch(entry[0], entry[1], entry[2])
+                if ((bad not in seq) and (bad2 not in seq)):
+                    valid = True
+                else:
+                    self.num_gen += 1
+                    print("bad")
+                    print(seq)
 
             entry = self.data.index[self.num_gen]
             seq = self.ref.fetch(entry[0], entry[1], entry[2])
@@ -91,9 +117,8 @@ class Mouse(Dataset):
             self.num_gen += 1
             if self.num_gen == self.total:
                 self.num_gen = 0
-            onehot = torch.tensor(onehot).type(torch.FloatTensor)
+            onehot = torch.tensor(onehot)
             onehot = onehot.view(4, 1, 1000)
-            label = torch.tensor(label).type(torch.FloatTensor)
 
         return onehot, label
 

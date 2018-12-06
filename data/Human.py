@@ -17,6 +17,7 @@ class Human(Dataset):
         self.transform = transform
         self.upsample = upsample
         self.epoch_size = epoch_size
+        self.validate = True
 
         if self.split not in self.split_list:
             raise ValueError('Wrong split entered! Please use split="train" '
@@ -46,7 +47,10 @@ class Human(Dataset):
 
     def __getitem__(self, index):
 
-        if self.split == 'train':
+        if self.validate == True:
+
+            if self.split == 'test':
+                self.upsample = 10
 
             if index % self.upsample == 0:
                 entry = self.ones.index[self.pos_num_gen]
@@ -58,8 +62,9 @@ class Human(Dataset):
                 self.pos_num_gen += 1
                 if self.pos_num_gen == self.pos_total:
                     self.pos_num_gen = 0
-                onehot = torch.tensor(onehot)
+                onehot = torch.tensor(onehot).type(torch.FloatTensor)
                 onehot = onehot.view(4, 1, 1000)
+                label = torch.tensor(label).type(torch.FloatTensor)
 
             else:
                 entry = self.zeros.index[self.neg_num_gen]
@@ -71,8 +76,9 @@ class Human(Dataset):
                 self.neg_num_gen += 1
                 if self.neg_num_gen == self.neg_total:
                     self.neg_num_gen = 0
-                onehot = torch.tensor(onehot)
+                onehot = torch.tensor(onehot).type(torch.FloatTensor)
                 onehot = onehot.view(4, 1, 1000)
+                label = torch.tensor(label).type(torch.FloatTensor)
 
         else:
 
@@ -85,8 +91,9 @@ class Human(Dataset):
             self.num_gen += 1
             if self.num_gen == self.total:
                 self.num_gen = 0
-            onehot = torch.tensor(onehot)
+            onehot = torch.tensor(onehot).type(torch.FloatTensor)
             onehot = onehot.view(4, 1, 1000)
+            label = torch.tensor(label).type(torch.FloatTensor)
 
         return onehot, label
 

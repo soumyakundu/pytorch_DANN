@@ -1,2 +1,4 @@
 *__pycache__*
 /data/mnist_m.tar
+*.pt
+*.h5

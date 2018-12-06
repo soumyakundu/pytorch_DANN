@@ -31,15 +31,12 @@ class Extractor(nn.Module):
         self.bn1 = nn.BatchNorm2d(300)
         self.bn2 = nn.BatchNorm2d(200)
         self.bn3 = nn.BatchNorm2d(200)
-        self.max_pool1 = nn.MaxPool2d((1,3))
-        self.max_pool2 = nn.MaxPool2d((1,4))
-        self.relu = nn.ReLU()
 
     def forward(self, input):
         input = input.expand(input.data.shape[0], 4, 1, 1000)
-        x = self.relu(self.max_pool1(self.bn1(self.conv1(input))))
-        x = self.relu(self.max_pool2(self.bn2(self.conv2(x))))
-        x = self.relu(self.max_pool2(self.bn3(self.conv3(x))))
+        x = F.relu(F.max_pool2d(self.bn1(self.conv1(input)), (1,3)))
+        x = F.relu(F.max_pool2d(self.bn2(self.conv2(x)), (1,4)))
+        x = F.relu(F.max_pool2d(self.bn3(self.conv3(x)), (1,4)))
         x = x.view(-1, 4000)
 
         return x
@@ -54,13 +51,12 @@ class Class_classifier(nn.Module):
         self.bn4 = nn.BatchNorm1d(1000)
         self.bn5 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
-        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        logits = self.dropout(self.relu(self.bn4(self.fc1(input))))
-        logits = self.dropout(self.relu(self.bn5(self.fc2(logits))))
-        logits = self.fc3(logits)
+        logits = F.relu(self.bn4(self.fc1(input)))
+        logits = F.relu(self.bn5(self.fc2(self.dropout(logits))))
+        logits = self.fc3(self.dropout(logits))
 
         return self.sigmoid(logits)
 
@@ -73,14 +69,13 @@ class Domain_classifier(nn.Module):
         self.fc3 = nn.Linear(1000, 1)
         self.bn1 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
-        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input, constant):
         input = GradReverse.grad_reverse(input, constant)
-        logits = self.dropout(self.relu(self.bn1(self.fc1(input))))
-        logits = self.dropout(self.relu(self.bn1(self.fc2(logits))))
-        logits = self.fc3(logits)
+        logits = F.relu(self.bn1(self.fc1(input)))
+        logits = F.relu(self.bn1(self.fc2(self.dropout(logits))))
+        logits = self.fc3(self.dropout(logits))
 
         return self.sigmoid(logits)
 
@@ -93,15 +88,15 @@ class Critic(nn.Module):
         self.fc3 = nn.Linear(1000, 1)
         self.bn1 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
-        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        logits = self.dropout(self.relu(self.fc1(input)))
-        logits = self.dropout(self.relu(self.fc2(logits)))
-        logits = self.fc3(logits)
+        logits = F.relu(self.bn1(self.fc1(input)))
+        logits = F.relu(self.bn1(self.fc2(self.dropout(logits))))
+        logits = self.fc3(self.dropout(logits))
 
         return self.sigmoid(logits)
+
 
 class Img_Extractor(nn.Module):
 

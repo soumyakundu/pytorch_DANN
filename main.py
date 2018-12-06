@@ -6,22 +6,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import torch.nn as nn
 import torch.optim as optim
-
 import numpy as np
-
 from models import models
 from train import test, train, params
 from util import utils
 from sklearn.manifold import TSNE
-
 import argparse, sys, os
-
 import torch
 from torch.autograd import Variable
-
 import time
+from torchsummary import summary
 
-
+#import keras_model
+#import keras
+#import metrics
 
 def visualizePerformance(feature_extractor, class_classifier, domain_classifier, src_test_dataloader,
                          tgt_test_dataloader, num_of_samples=None, imgName=None):
@@ -38,6 +36,8 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
 
     :return:
     """
+
+    print("\n WARNING: I AM HERE \n")
 
     # Setup the network
     feature_extractor.eval()
@@ -125,13 +125,12 @@ def main(args):
         params.embed_plot_epoch = args.embed_plot_epoch
     params.lr = args.lr
 
-
     if args.save_dir is not None:
         params.save_dir = args.save_dir
-    #else:
-        #print('Figures will be saved in ./experiment folder.')
 
     print("Starting up")
+
+    device = torch.device("cuda")
 
     # prepare the source data and target data
 
@@ -140,43 +139,96 @@ def main(args):
     tgt_train_dataloader = utils.get_train_loader(params.target_domain)
     tgt_test_dataloader = utils.get_test_loader(params.target_domain)
 
-    if params.fig_mode is not None:
-        print('Images from training on source domain:')
-
-        utils.displayImages(src_train_dataloader, imgName='source')
-
-        print('Images from test on target domain:')
-        utils.displayImages(tgt_test_dataloader, imgName='target')
-
     # init models
+
     model_index = params.source_domain + '_' + params.target_domain
     feature_extractor = params.extractor_dict[model_index]
     class_classifier = params.class_dict[model_index]
     domain_classifier = params.domain_dict[model_index]
+    critic = models.Critic()
 
-    if params.use_gpu:
-        feature_extractor.cuda()
-        class_classifier.cuda()
-        domain_classifier.cuda()
+    """
+    kmodel1 = keras_model.getModelGivenModelOptionsAndWeightInits('/srv/scratch/soumyak/metadata/encode-roadmap.dnase_tf-chip.batch_256.params.npz')
 
-    # init criterions
-    #class_criterion = nn.NLLLoss()
-    #domain_criterion = nn.NLLLoss()
+    kmodel2 = keras.models.load_model('/srv/scratch/soumyak/outputs/final/human', custom_objects={"positive_accuracy": metrics.positive_accuracy,
+                    "negative_accuracy": metrics.negative_accuracy,
+                    "precision": metrics.precision,
+                    "recall": metrics.recall})
+                    #"softMaxAxis1":kerasAC.activations.softMaxAxis1})
 
-    class_criterion = nn.CrossEntropyLoss()
-    domain_criterion = nn.CrossEntropyLoss()
+    kmodel2.save_weights('my_weights.h5')
+    kmodel1.load_weights('my_weights.h5')
 
-    # init optimizer
-    optimizer = optim.SGD([{'params': feature_extractor.parameters()},
-                            {'params': class_classifier.parameters()},
-                            {'params': domain_classifier.parameters()}], lr= params.lr, momentum= 0.9)
+    weight_dict = dict()
+    for layer in kmodel1.layers:
+        if type(layer) is keras.layers.convolutional.Conv2D:
+            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(layer.get_weights()[0], (3, 2, 0, 1))
+            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
+        elif type(layer) is keras.layers.Dense:
+            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(layer.get_weights()[0], (1, 0))
+            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
+        elif type(layer) is keras.layers.normalization.BatchNormalization:
+            weight_dict[layer.get_config()['name'] + '.weight'] = layer.get_weights()[0]
+            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
+            weight_dict[layer.get_config()['name'] + '.running_mean'] = layer.get_weights()[2]
+            weight_dict[layer.get_config()['name'] + '.running_var'] = layer.get_weights()[3]
+
+    #feature_extractor.load_state_dict(torch.load('best_feature_extractor.pt'))
+    #class_classifier.load_state_dict(torch.load('best_class_classifier.pt'))
+
+    for key in feature_extractor.state_dict().keys():
+        if not key.endswith('num_batches_tracked'):
+            feature_extractor.state_dict()[key] = torch.from_numpy(weight_dict[key])
+
+    for key in class_classifier.state_dict().keys():
+        if not key.endswith('num_batches_tracked'):
+            class_classifier.state_dict()[key] = torch.from_numpy(weight_dict[key])
+
+    torch.save(feature_extractor.state_dict(), 'feature_extractor.pt')
+    torch.save(class_classifier.state_dict(), 'class_classifier.pt')
+    """
+
+    feature_extractor.load_state_dict(torch.load('feature_extractor.pt'))
+    class_classifier.load_state_dict(torch.load('class_classifier.pt'))
+
+    print("Loaded weights")
+
+    feature_extractor.to(device)
+    class_classifier.to(device)
+    domain_classifier.to(device)
+    critic.to(device)
+
+    class_criterion = nn.BCELoss()
+    domain_criterion = nn.BCELoss()
+
+    if args.training_mode == 'dann':
+        optimizer = optim.Adam([{'params': feature_extractor.parameters()},
+                               {'params': class_classifier.parameters()},
+                               {'params': domain_classifier.parameters()}], lr= params.lr)
+    elif args.training_mode == 'wdgrl':
+        optimizer = optim.Adam([{'params': feature_extractor.parameters()},
+                               {'params': class_classifier.parameters()},
+                               {'params': critic.parameters()}], lr= params.lr)
+    else:
+        optimizer = optim.Adam([{'params': feature_extractor.parameters()},
+                                {'params': class_classifier.parameters()}], lr=params.lr)
+
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+
+    best_auprc = 0.0
 
     for epoch in range(params.epochs):
         print('Epoch: {}'.format(epoch))
-        train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, class_criterion, domain_criterion,
-                    src_train_dataloader, tgt_train_dataloader, optimizer, epoch)
-        test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader)
-
+        train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion,
+                    src_train_dataloader, tgt_train_dataloader, optimizer, epoch, device)
+        auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, 'target', device)
+        if auprc > best_auprc:
+            best_auprc = auprc
+            print("Best AUPRC")
+            torch.save(feature_extractor.state_dict(), 'best_feature_extractor_wdgrl.pt')
+            torch.save(class_classifier.state_dict(), 'best_class_classifier_wdgrl.pt')
+            torch.save(domain_classifier.state_dict(), 'best_domain_classifier_wdgrl.pt')
+            print("Saved Best Model")
 
         # Plot embeddings periodically.
         if epoch % params.embed_plot_epoch == 0 and params.fig_mode is not None:
@@ -197,12 +249,11 @@ def parse_arguments(argv):
     parser.add_argument('--max_epoch', type=int, default=100, help='The max number of epochs.')
     parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
     parser.add_argument('--lr', type= float, default= 0.001, help= 'Learning rate.')
-    parser.add_argument('--upsample', type=int, default=5, help='Set frequency of sampling positive training example.')
+    parser.add_argument('--upsample', type=int, default=3, help='Set frequency of sampling positive training example.')
     parser.add_argument('--num_train', type=int, default=100000, help='Number of training examples per epoch.')
     parser.add_argument('--num_test', type=int, default=50000, help='Number of testing examples per epoch.')
 
     return parser.parse_args()
-
 
 
 if __name__ == '__main__':

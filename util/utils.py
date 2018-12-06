@@ -2,24 +2,17 @@ import torchvision
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
 from train import params
 from sklearn.manifold import TSNE
-
-
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-
 import numpy as np
 import os, time
 from data import SynDig, Human, Mouse
 
 
 def get_train_loader(dataset):
-    """
-    Get train dataloader of source domain or target domain
-    :return: dataloader
-    """
+
     if dataset == 'MNIST':
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -28,9 +21,7 @@ def get_train_loader(dataset):
 
         data = datasets.MNIST(root= params.mnist_path, train= True, transform= transform,
                               download= True)
-
         dataloader = DataLoader(dataset= data, batch_size= params.batch_size, shuffle= True)
-
 
     elif dataset == 'MNIST_M':
         transform = transforms.Compose([
@@ -40,7 +31,6 @@ def get_train_loader(dataset):
         ])
 
         data = datasets.ImageFolder(root=params.mnistm_path + '/train', transform= transform)
-
         dataloader = DataLoader(dataset = data, batch_size= params.batch_size, shuffle= True)
 
     elif dataset == 'SVHN':
@@ -52,10 +42,9 @@ def get_train_loader(dataset):
 
         data1 = datasets.SVHN(root=params.svhn_path, split='train', transform=transform, download=True)
         data2 = datasets.SVHN(root= params.svhn_path, split= 'extra', transform = transform, download= True)
-
         data = torch.utils.data.ConcatDataset((data1, data2))
-
         dataloader = DataLoader(dataset=data, batch_size=params.batch_size, shuffle=True)
+
     elif dataset == 'SynDig':
         transform = transforms.Compose([
             transforms.RandomCrop((28)),
@@ -64,7 +53,6 @@ def get_train_loader(dataset):
         ])
 
         data = SynDig.SynDig(root= params.syndig_path, split= 'train', transform= transform, download= True)
-
         dataloader = DataLoader(dataset = data, batch_size= params.batch_size, shuffle= True)
 
     elif dataset == 'Human':
@@ -83,12 +71,8 @@ def get_train_loader(dataset):
     return dataloader
 
 
-
 def get_test_loader(dataset):
-    """
-    Get test dataloader of source domain or target domain
-    :return: dataloader
-    """
+
     if dataset == 'MNIST':
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -97,8 +81,8 @@ def get_test_loader(dataset):
 
         data = datasets.MNIST(root= params.mnist_path, train= False, transform= transform,
                               download= True)
-
         dataloader = DataLoader(dataset= data, batch_size= params.batch_size, shuffle= True)
+
     elif dataset == 'MNIST_M':
         transform = transforms.Compose([
             # transforms.RandomCrop((28)),
@@ -108,8 +92,8 @@ def get_test_loader(dataset):
         ])
 
         data = datasets.ImageFolder(root=params.mnistm_path + '/test', transform= transform)
-
         dataloader = DataLoader(dataset = data, batch_size= params.batch_size, shuffle= True)
+
     elif dataset == 'SVHN':
         transform = transforms.Compose([
             transforms.CenterCrop((28)),
@@ -118,8 +102,8 @@ def get_test_loader(dataset):
         ])
 
         data = datasets.SVHN(root= params.svhn_path, split= 'test', transform = transform, download= True)
-
         dataloader = DataLoader(dataset = data, batch_size= params.batch_size, shuffle= True)
+
     elif dataset == 'SynDig':
         transform = transforms.Compose([
             transforms.CenterCrop((28)),
@@ -128,18 +112,17 @@ def get_test_loader(dataset):
         ])
 
         data = SynDig.SynDig(root= params.syndig_path, split= 'test', transform= transform, download= True)
-
         dataloader = DataLoader(dataset= data, batch_size= params.batch_size, shuffle= True)
 
     elif dataset == 'Human':
 
         data = Human.Human(split = 'test', upsample = params.upsample, epoch_size = params.num_test)
-        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+        dataloader = DataLoader(dataset = data, batch_size = 500, shuffle = False)
 
     elif dataset == 'Mouse':
 
         data = Mouse.Mouse(split = 'test', upsample = params.upsample, epoch_size = params.num_test)
-        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+        dataloader = DataLoader(dataset = data, batch_size = 500, shuffle = False)
 
     else:
         raise Exception('There is no dataset named {}'.format(str(dataset)))
