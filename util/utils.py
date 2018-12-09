@@ -71,7 +71,12 @@ def get_train_loader(dataset):
     return dataloader
 
 
-def get_test_loader(dataset):
+def get_test_loader(dataset, mode):
+
+    if mode == 'train':
+        split = 'validate'
+    else:
+        split = 'test'
 
     if dataset == 'MNIST':
         transform = transforms.Compose([
@@ -116,12 +121,12 @@ def get_test_loader(dataset):
 
     elif dataset == 'Human':
 
-        data = Human.Human(split = 'test', upsample = params.test_upsample, epoch_size = params.num_test)
+        data = Human.Human(split = split, upsample = params.test_upsample, epoch_size = params.num_test)
         dataloader = DataLoader(dataset = data, batch_size = params.test_batch_size, shuffle = False)
 
     elif dataset == 'Mouse':
 
-        data = Mouse.Mouse(split = 'test', upsample = params.test_upsample, epoch_size = params.num_test)
+        data = Mouse.Mouse(split = split, upsample = params.test_upsample, epoch_size = params.num_test)
         dataloader = DataLoader(dataset = data, batch_size = params.test_batch_size, shuffle = False)
 
     else:

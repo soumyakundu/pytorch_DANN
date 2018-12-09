@@ -46,7 +46,7 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
 
     # Randomly select samples from source domain and target domain.
     if num_of_samples is None:
-        num_of_samples = params.batch_size
+        num_of_samples = params.test_batch_size
     else:
         assert len(src_test_dataloader) * num_of_samples, \
             'The number of samples can not bigger than dataset.' # NOT PRECISELY COMPUTATION
@@ -64,7 +64,7 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
 
         s_tags.append(torch.zeros((labels.size()[0])).type(torch.LongTensor))
 
-        if len(s_images * params.batch_size) > num_of_samples:
+        if len(s_images * params.test_batch_size) > num_of_samples:
             break
 
     s_images, s_labels, s_tags = torch.cat(s_images)[:num_of_samples], \
@@ -84,7 +84,7 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
 
         t_tags.append(torch.ones((labels.size()[0])).type(torch.LongTensor))
 
-        if len(t_images * params.batch_size) > num_of_samples:
+        if len(t_images * params.test_batch_size) > num_of_samples:
             break
 
     t_images, t_labels, t_tags = torch.cat(t_images)[:num_of_samples], \
@@ -103,9 +103,17 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
         dann_tsne = tsne.fit_transform(np.concatenate((embedding1.detach().numpy(),
                                                    embedding2.detach().numpy())))
 
+    if params.training_mode == 'source':
+        title = 'Source'
+    elif params.training_mode == 'target':
+        title = 'Target'
+    elif params.training_mode == 'dann':
+        title = 'Domain Adversarial Neural Network (DANN)'
+    elif params.training_mode == 'wdgrl':
+        title = 'Wasserstein Distance Guided Representation Learning (WDGRL)'
 
     utils.plot_embedding(dann_tsne, np.concatenate((s_labels, t_labels)),
-                         np.concatenate((s_tags, t_tags)), 'Domain Adaptation', imgName)
+                         np.concatenate((s_tags, t_tags)), title, imgName)
 
 
 def main(args):
@@ -137,9 +145,9 @@ def main(args):
 
     #"""
     src_train_dataloader = utils.get_train_loader(params.source_domain)
-    src_test_dataloader = utils.get_test_loader(params.source_domain)
+    src_test_dataloader = utils.get_test_loader(params.source_domain, args.mode)
     tgt_train_dataloader = utils.get_train_loader(params.target_domain)
-    tgt_test_dataloader = utils.get_test_loader(params.target_domain)
+    tgt_test_dataloader = utils.get_test_loader(params.target_domain, args.mode)
     #"""
 
     # init models
@@ -227,8 +235,11 @@ def main(args):
 
     for epoch in range(params.epochs):
         print('Epoch: {}'.format(epoch))
-        train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion, src_train_dataloader, tgt_train_dataloader, optimizer, epoch, device)
-        auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, args.objective, device, class_criterion)
+        if args.mode == 'train':
+            train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion, src_train_dataloader, tgt_train_dataloader, optimizer, epoch, device)
+            auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, args.objective, device, class_criterion)
+        elif args.mode == 'test':
+            auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, args.objective, device, class_criterion)
         if auprc > best_auprc:
             best_auprc = auprc
             print("Best AUPRC")
@@ -243,7 +254,7 @@ def main(args):
         # Plot embeddings periodically.
         if epoch % params.embed_plot_epoch == 0 and params.fig_mode is not None:
             visualizePerformance(feature_extractor, class_classifier, domain_classifier, src_test_dataloader,
-                                 tgt_test_dataloader, imgName='embedding_' + str(epoch))
+                                 tgt_test_dataloader, imgName = args.training_mode + '_' + str(epoch))
 
 def parse_arguments(argv):
     """Command line parse."""
@@ -252,18 +263,19 @@ def parse_arguments(argv):
     parser.add_argument('--source_domain', type= str, default= 'Human', help= 'Choose source domain.')
     parser.add_argument('--target_domain', type= str, default= 'Mouse', help = 'Choose target domain.')
     parser.add_argument('--fig_mode', type=str, default=None, help='Plot experiment figures.')
-    parser.add_argument('--save_dir', type=str, default=None, help='Path to save plotted images.')
+    parser.add_argument('--save_dir', type=str, default='/srv/scratch/soumyak/outputs/', help='Path to save plotted images.')
     parser.add_argument('--training_mode', type=str, default='dann', help='Choose a mode to train the model.')
-    parser.add_argument('--max_epoch', type=int, default=100, help='The max number of epochs.')
-    parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
+    parser.add_argument('--max_epoch', type=int, default=15, help='The max number of epochs.')
+    parser.add_argument('--embed_plot_epoch', type= int, default=1, help= 'Epoch number of plotting embeddings.')
     parser.add_argument('--lr', type= float, default= 0.001, help= 'Learning rate.')
-    parser.add_argument('--train_upsample', type=int, default=3, help='Set frequency of sampling positive training examples.')
+    parser.add_argument('--train_upsample', type=int, default=2, help='Set frequency of sampling positive training examples.')
     parser.add_argument('--test_upsample', type=int, default=0, help='Set frequency of sampling positive testing examples.')
     parser.add_argument('--num_train', type=int, default=100000, help='Number of training examples per epoch.')
-    parser.add_argument('--num_test', type=int, default=50000, help='Number of testing examples per epoch.')
-    parser.add_argument('--train_batch_size', type=int, default=1000, help='Set training mini-batch size.')
+    parser.add_argument('--num_test', type=int, default=100000, help='Number of testing examples per epoch.')
+    parser.add_argument('--train_batch_size', type=int, default=500, help='Set training mini-batch size.')
     parser.add_argument('--test_batch_size', type=int, default=500, help='Set testing mini-batch size.')
-    parser.add_argument('--objective', default='source', help='Select source or target as the objective to maximize its AUPRC.')
+    parser.add_argument('--objective', default='target', help='Select source or target as the objective to maximize its AUPRC.')
+    parser.add_argument('--mode', default='train', help='Set train or test mode.')
 
     return parser.parse_args()
 

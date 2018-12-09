@@ -9,6 +9,7 @@ class Human(Dataset):
 
     split_list = {
         'train': '/srv/scratch/soumyak/inputs/human_liver_adult.train.bed',
+        'validate': '/srv/scratch/soumyak/inputs/human_liver_adult.validate.bed',
         'test': '/srv/scratch/soumyak/inputs/human_liver_adult.test.bed'
     }
 

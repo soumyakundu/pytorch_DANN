@@ -1,7 +1,7 @@
 from models import models
 
 # utility params
-fig_mode = None
+fig_mode = 'save'
 embed_plot_epoch=10
 
 # model params

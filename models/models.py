@@ -81,8 +81,8 @@ class Domain_classifier(nn.Module):
 
     def forward(self, input, constant):
         input = GradReverse.grad_reverse(input, constant)
-        logits = self.dropout(self.relu(self.fc4(input)))
-        logits = self.dropout(self.relu(self.fc5(logits)))
+        logits = self.dropout(self.relu(self.bn6(self.fc4(input))))
+        logits = self.dropout(self.relu(self.bn7(self.fc5(logits))))
         logits = self.fc6(logits)
 
         return self.sigmoid(logits)
