@@ -1,6 +1,6 @@
 import numpy as np
 
-def getModelGivenModelOptionsAndWeightInits(init_weights,seed=1234):
+def getModelGivenModelOptionsAndWeightInits(init_weights=None,seed=1234):
     np.random.seed(seed)
     import keras;
     from keras.models import Sequential
@@ -51,33 +51,33 @@ def getModelGivenModelOptionsAndWeightInits(init_weights,seed=1234):
         outputs = Activation("sigmoid")(x)
 
     else:
-        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4))(inputs)
-        x = BatchNormalization(axis=-1)(x)
+        x = Conv2D(filters=300,kernel_size=(1,19),input_shape=(1,1000,4), padding='same', name='conv1')(inputs)
+        x = BatchNormalization(axis=-1, name='bn1')(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,3))(x)
 
-        x = Conv2D(filters=200,kernel_size=(1,11))(x)
-        x = BatchNormalization(axis=-1)(x)
+        x = Conv2D(filters=200,kernel_size=(1,11), padding='same', name='conv2')(x)
+        x = BatchNormalization(axis=-1, name='bn2')(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,4))(x)
 
-        x = Conv2D(filters=200,kernel_size=(1,7))(x)
-        x = BatchNormalization(axis=-1)(x)
+        x = Conv2D(filters=200,kernel_size=(1,7), padding='same', name='conv3')(x)
+        x = BatchNormalization(axis=-1, name='bn3')(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(1,4))(x)
 
         x = Flatten()(x)
-        x = Dense(1000)(x)
-        x = BatchNormalization(axis=-1)(x)
+        x = Dense(1000, name='fc1')(x)
+        x = BatchNormalization(axis=-1, name='bn4')(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
 
-        x = Dense(1000)(x)
-        x = BatchNormalization(axis=-1)(x)
+        x = Dense(1000, name='fc2')(x)
+        x = BatchNormalization(axis=-1, name='bn5')(x)
         x = Activation('relu')(x)
         x = Dropout(0.3)(x)
 
-        x = Dense(1)(x)
+        x = Dense(1, name='fc3')(x)
         outputs = Activation("sigmoid")(x)
 
     adam = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)

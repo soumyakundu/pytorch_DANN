@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.nn.init as init
+import numpy as np
 
 class GradReverse(torch.autograd.Function):
     """
@@ -28,18 +29,19 @@ class Extractor(nn.Module):
         self.conv1 = nn.Conv2d(4, 300, kernel_size=(1,19), padding=(0,9))
         self.conv2 = nn.Conv2d(300, 200, kernel_size=(1,11), padding=(0,5))
         self.conv3 = nn.Conv2d(200, 200, kernel_size=(1,7), padding=(0,3))
-        self.bn1 = nn.BatchNorm2d(300)
-        self.bn2 = nn.BatchNorm2d(200)
-        self.bn3 = nn.BatchNorm2d(200)
+        self.bn1 = nn.BatchNorm2d(300, eps=0.001, momentum=0.01)
+        self.bn2 = nn.BatchNorm2d(200, eps=0.001, momentum=0.01)
+        self.bn3 = nn.BatchNorm2d(200, eps=0.001, momentum=0.01)
         self.max_pool1 = nn.MaxPool2d((1,3))
         self.max_pool2 = nn.MaxPool2d((1,4))
         self.relu = nn.ReLU()
 
     def forward(self, input):
         input = input.expand(input.data.shape[0], 4, 1, 1000)
-        x = self.relu(self.max_pool1(self.bn1(self.conv1(input))))
-        x = self.relu(self.max_pool2(self.bn2(self.conv2(x))))
-        x = self.relu(self.max_pool2(self.bn3(self.conv3(x))))
+        x = self.max_pool1(self.relu(self.bn1(self.conv1(input))))
+        x = self.max_pool2(self.relu(self.bn2(self.conv2(x))))
+        x = self.max_pool2(self.relu(self.bn3(self.conv3(x))))
+        x = x.permute(0,2,3,1).contiguous()
         x = x.view(-1, 4000)
 
         return x
@@ -51,8 +53,8 @@ class Class_classifier(nn.Module):
         self.fc1 = nn.Linear(4000, 1000)
         self.fc2 = nn.Linear(1000, 1000)
         self.fc3 = nn.Linear(1000, 1)
-        self.bn4 = nn.BatchNorm1d(1000)
-        self.bn5 = nn.BatchNorm1d(1000)
+        self.bn4 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
+        self.bn5 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
         self.dropout = nn.Dropout(p=0.3)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -68,19 +70,20 @@ class Domain_classifier(nn.Module):
 
     def __init__(self):
         super(Domain_classifier, self).__init__()
-        self.fc1 = nn.Linear(4000, 1000)
-        self.fc2 = nn.Linear(1000, 1000)
-        self.fc3 = nn.Linear(1000, 1)
-        self.bn1 = nn.BatchNorm1d(1000)
+        self.fc4 = nn.Linear(4000, 1000)
+        self.fc5 = nn.Linear(1000, 1000)
+        self.fc6 = nn.Linear(1000, 1)
+        self.bn6 = nn.BatchNorm1d(1000)
+        self.bn7 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input, constant):
         input = GradReverse.grad_reverse(input, constant)
-        logits = self.dropout(self.relu(self.bn1(self.fc1(input))))
-        logits = self.dropout(self.relu(self.bn1(self.fc2(logits))))
-        logits = self.fc3(logits)
+        logits = self.dropout(self.relu(self.fc4(input)))
+        logits = self.dropout(self.relu(self.fc5(logits)))
+        logits = self.fc6(logits)
 
         return self.sigmoid(logits)
 
@@ -88,20 +91,20 @@ class Critic(nn.Module):
 
     def __init__(self):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(4000, 1000)
-        self.fc2 = nn.Linear(1000, 1000)
-        self.fc3 = nn.Linear(1000, 1)
-        self.bn1 = nn.BatchNorm1d(1000)
+        self.fc4 = nn.Linear(4000, 1000)
+        self.fc5 = nn.Linear(1000, 1000)
+        self.fc6 = nn.Linear(1000, 1)
+        self.bn6 = nn.BatchNorm1d(1000)
+        self.bn7 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
         self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, input):
-        logits = self.dropout(self.relu(self.fc1(input)))
-        logits = self.dropout(self.relu(self.fc2(logits)))
-        logits = self.fc3(logits)
+        logits = self.dropout(self.relu(self.fc4(input)))
+        logits = self.dropout(self.relu(self.fc5(logits)))
+        logits = self.fc6(logits)
 
-        return self.sigmoid(logits)
+        return logits
 
 class Img_Extractor(nn.Module):
 

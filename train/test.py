@@ -6,9 +6,9 @@ from torch.autograd import Variable
 import numpy as np
 from sklearn.metrics import average_precision_score
 from train import params
+from train.accuracy_metrics import *
 
-
-def test(feature_extractor, class_classifier, domain_classifier, source_dataloader, target_dataloader, auprc, objective, device):
+def test(feature_extractor, class_classifier, domain_classifier, source_dataloader, target_dataloader, auprc, objective, device, class_criterion):
 
     feature_extractor.eval()
     class_classifier.eval()
@@ -31,6 +31,9 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
     target_TP = 0
     target_TN = 0
 
+    source_loss = 0.0
+    target_loss = 0.0
+
     for batch_idx, sdata in enumerate(source_dataloader):
 
         with torch.no_grad():
@@ -48,6 +51,8 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
 
             output1 = class_classifier(feature_extractor(input1))
             source_correct += torch.round(output1).eq(label1.data.view_as(output1)).cpu().sum()
+
+            source_loss += class_criterion(output1, label1).item()
 
             src_preds = domain_classifier(feature_extractor(input1), constant)
             src_correct += torch.round(src_preds).eq(src_labels.data.view_as(src_preds)).cpu().sum()
@@ -69,6 +74,13 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
             source_TP += np.sum(np.logical_and(output1_np == 1, label1_np == 1))
             source_TN += np.sum(np.logical_and(output1_np == 0, label1_np == 0))
 
+            if (batch_idx + 1) % 10 == 0:
+                print('[{}/{} ({:.0f}%)]\tClass Loss: {:.6f}'.format(
+                    batch_idx * len(input1), len(source_dataloader.dataset),
+                    100. * batch_idx / len(source_dataloader), source_loss / 10
+                ))
+                source_loss = 0.0
+
     for batch_idx, tdata in enumerate(target_dataloader):
 
         with torch.no_grad():
@@ -86,6 +98,8 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
 
             output2 = class_classifier(feature_extractor(input2))
             target_correct += torch.round(output2).eq(label2.data.view_as(output2)).cpu().sum()
+
+            target_loss += class_criterion(output2, label2).item()
 
             tgt_preds = domain_classifier(feature_extractor(input2), constant)
             tgt_correct += torch.round(tgt_preds).eq(tgt_labels.data.view_as(tgt_preds)).cpu().sum()
@@ -107,8 +121,20 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
             target_TP += np.sum(np.logical_and(output2_np == 1, label2_np == 1))
             target_TN += np.sum(np.logical_and(output2_np == 0, label2_np == 0))
 
+            if (batch_idx + 1) % 10 == 0:
+                print('[{}/{} ({:.0f}%)]\tClass Loss: {:.6f}'.format(
+                    batch_idx * len(input2), len(target_dataloader.dataset),
+                    100. * batch_idx / len(target_dataloader), target_loss / 10
+                ))
+                target_loss = 0.0
 
     domain_correct = tgt_correct + src_correct
+
+    #source_labels = np.array(source_labels)
+    #source_preds = np.array(source_preds)
+
+    #source_labels = np.array([[i] for i in source_labels])
+    #source_preds = np.array([[i] for i in source_preds])
 
     source_auprc = average_precision_score(source_labels, source_preds)
     target_auprc = average_precision_score(target_labels, target_preds)

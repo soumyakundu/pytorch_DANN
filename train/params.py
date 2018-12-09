@@ -7,11 +7,13 @@ embed_plot_epoch=10
 # model params
 use_gpu = True
 
-batch_size = 500
-epochs = 1000
+train_batch_size = 1000
+test_batch_size = 500
+epochs = 100
 num_train = 100000
 num_test = 50000
-upsample = 5
+train_upsample = 3
+test_upsample = 0
 gamma = 10
 theta = 1
 

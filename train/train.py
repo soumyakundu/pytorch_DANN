@@ -29,6 +29,11 @@ def set_requires_grad(model, requires_grad=True):
 def train(training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion,
           source_dataloader, target_dataloader, optimizer, epoch, device):
 
+    class_optim = optim.Adam([{'params': feature_extractor.parameters()},
+                              {'params': class_classifier.parameters()}], lr=0.0001)
+
+    critic_optim = optim.Adam(critic.parameters(), lr=0.0001)
+
     feature_extractor.train()
     class_classifier.train()
     domain_classifier.train()
@@ -148,11 +153,6 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
 
             source_labels = source_labels.to(device)
             target_labels = target_labels.to(device)
-
-            class_optim = optim.Adam([{'params': feature_extractor.parameters()},
-                                      {'params': class_classifier.parameters()}], lr=params.lr)
-
-            critic_optim = optim.Adam(critic.parameters(), lr=params.lr)
 
             set_requires_grad(feature_extractor, requires_grad=False)
             set_requires_grad(critic, requires_grad=True)

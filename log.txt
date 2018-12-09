@@ -1,0 +1,13 @@
+Best Human Model:
+
+Source Accuracy: 836893/1000000 (83.6893%)
+Target Accuracy: 696567/1000000 (69.6567%)
+Domain Accuracy: 996685/2000000 (49.8342%)
+Source AUPRC: 0.5848
+Target AUPRC: 0.3564
+Source Positive Accuracy: 47005/58739 (80.0235%)
+Source Negative Accuracy: 789888/941261 (83.9181%)
+Target Positive Accuracy: 44642/59749 (74.7159%)
+Target Negative Accuracy: 651925/940251 (69.3352%)
+
+

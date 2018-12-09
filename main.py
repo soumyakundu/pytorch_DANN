@@ -108,8 +108,6 @@ def visualizePerformance(feature_extractor, class_classifier, domain_classifier,
                          np.concatenate((s_tags, t_tags)), 'Domain Adaptation', imgName)
 
 
-
-
 def main(args):
 
     # Set global parameters.
@@ -117,27 +115,32 @@ def main(args):
     params.epochs = args.max_epoch
     params.num_train = args.num_train
     params.num_test = args.num_test
-    params.upsample = args.upsample
+    params.train_upsample = args.train_upsample
+    params.test_upsample = args.test_upsample
+    params.train_batch_size = args.train_batch_size
+    params.test_batch_size = args.test_batch_size
     params.training_mode = args.training_mode
     params.source_domain = args.source_domain
     params.target_domain = args.target_domain
     if params.embed_plot_epoch is None:
         params.embed_plot_epoch = args.embed_plot_epoch
     params.lr = args.lr
-
     if args.save_dir is not None:
         params.save_dir = args.save_dir
 
     print("Starting up")
 
     device = torch.device("cuda")
+    device2 = torch.device("cpu")
 
     # prepare the source data and target data
 
+    #"""
     src_train_dataloader = utils.get_train_loader(params.source_domain)
     src_test_dataloader = utils.get_test_loader(params.source_domain)
     tgt_train_dataloader = utils.get_train_loader(params.target_domain)
     tgt_test_dataloader = utils.get_test_loader(params.target_domain)
+    #"""
 
     # init models
 
@@ -150,48 +153,47 @@ def main(args):
     """
     kmodel1 = keras_model.getModelGivenModelOptionsAndWeightInits('/srv/scratch/soumyak/metadata/encode-roadmap.dnase_tf-chip.batch_256.params.npz')
 
-    kmodel2 = keras.models.load_model('/srv/scratch/soumyak/outputs/final/human', custom_objects={"positive_accuracy": metrics.positive_accuracy,
+    kmodel2 = keras.models.load_model('/srv/scratch/soumyak/outputs/human_liver_adult', custom_objects={"positive_accuracy": metrics.positive_accuracy,
                     "negative_accuracy": metrics.negative_accuracy,
                     "precision": metrics.precision,
                     "recall": metrics.recall})
-                    #"softMaxAxis1":kerasAC.activations.softMaxAxis1})
 
     kmodel2.save_weights('my_weights.h5')
+    kmodel2.save('my_model.h5')
     kmodel1.load_weights('my_weights.h5')
 
     weight_dict = dict()
     for layer in kmodel1.layers:
         if type(layer) is keras.layers.convolutional.Conv2D:
-            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(layer.get_weights()[0], (3, 2, 0, 1))
-            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
+            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(np.array(layer.get_weights()[0]), (3, 2, 0, 1))
+            weight_dict[layer.get_config()['name'] + '.bias'] = np.array(layer.get_weights()[1])
         elif type(layer) is keras.layers.Dense:
-            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(layer.get_weights()[0], (1, 0))
-            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
+            weight_dict[layer.get_config()['name'] + '.weight'] = np.transpose(np.array(layer.get_weights()[0]), (1, 0))
+            weight_dict[layer.get_config()['name'] + '.bias'] = np.array(layer.get_weights()[1])
         elif type(layer) is keras.layers.normalization.BatchNormalization:
-            weight_dict[layer.get_config()['name'] + '.weight'] = layer.get_weights()[0]
-            weight_dict[layer.get_config()['name'] + '.bias'] = layer.get_weights()[1]
-            weight_dict[layer.get_config()['name'] + '.running_mean'] = layer.get_weights()[2]
-            weight_dict[layer.get_config()['name'] + '.running_var'] = layer.get_weights()[3]
+            weight_dict[layer.get_config()['name'] + '.weight'] = np.array(layer.get_weights()[0])
+            weight_dict[layer.get_config()['name'] + '.bias'] = np.array(layer.get_weights()[1])
+            weight_dict[layer.get_config()['name'] + '.running_mean'] = np.array(layer.get_weights()[2])
+            weight_dict[layer.get_config()['name'] + '.running_var'] = np.array(layer.get_weights()[3])
 
-    #feature_extractor.load_state_dict(torch.load('best_feature_extractor.pt'))
-    #class_classifier.load_state_dict(torch.load('best_class_classifier.pt'))
+    pyt_state_dict = feature_extractor.state_dict()
+    for key in pyt_state_dict.keys():
+        if not key.endswith('num_batches_tracked'):# and not key.endswith('running_mean') and not key.endswith('running_var'):# and not key.startswith('bn'):
+            pyt_state_dict[key] = torch.from_numpy(weight_dict[key]).contiguous()
+    feature_extractor.load_state_dict(pyt_state_dict)
 
-    for key in feature_extractor.state_dict().keys():
-        if not key.endswith('num_batches_tracked'):
-            feature_extractor.state_dict()[key] = torch.from_numpy(weight_dict[key])
-
-    for key in class_classifier.state_dict().keys():
-        if not key.endswith('num_batches_tracked'):
-            class_classifier.state_dict()[key] = torch.from_numpy(weight_dict[key])
+    pyt_state_dict2 = class_classifier.state_dict()
+    for key in pyt_state_dict2.keys():
+        if not key.endswith('num_batches_tracked'):# and not key.endswith('running_mean') and not key.endswith('running_var'):# and not key.startswith('bn'):
+            pyt_state_dict2[key] = torch.from_numpy(weight_dict[key]).contiguous()
+    class_classifier.load_state_dict(pyt_state_dict2)
 
     torch.save(feature_extractor.state_dict(), 'feature_extractor.pt')
     torch.save(class_classifier.state_dict(), 'class_classifier.pt')
-    """
+    #"""
 
-    feature_extractor.load_state_dict(torch.load('feature_extractor.pt'))
-    class_classifier.load_state_dict(torch.load('class_classifier.pt'))
-
-    print("Loaded weights")
+    feature_extractor.load_state_dict(torch.load('best_feature_extractor.pt'))
+    class_classifier.load_state_dict(torch.load('best_class_classifier.pt'))
 
     feature_extractor.to(device)
     class_classifier.to(device)
@@ -201,41 +203,47 @@ def main(args):
     class_criterion = nn.BCELoss()
     domain_criterion = nn.BCELoss()
 
+    best_auprc = 0.0
+
     if args.training_mode == 'dann':
         optimizer = optim.Adam([{'params': feature_extractor.parameters()},
                                {'params': class_classifier.parameters()},
                                {'params': domain_classifier.parameters()}], lr= params.lr)
+        best_auprc = 0.41
+        args.objective = 'target'
     elif args.training_mode == 'wdgrl':
         optimizer = optim.Adam([{'params': feature_extractor.parameters()},
                                {'params': class_classifier.parameters()},
                                {'params': critic.parameters()}], lr= params.lr)
+        best_auprc = 0.41
+        args.objective = 'target'
     else:
         optimizer = optim.Adam([{'params': feature_extractor.parameters()},
                                 {'params': class_classifier.parameters()}], lr=params.lr)
+        best_auprc = 0.61
+        args.objective = 'source'
 
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
-    best_auprc = 0.0
-
     for epoch in range(params.epochs):
         print('Epoch: {}'.format(epoch))
-        train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion,
-                    src_train_dataloader, tgt_train_dataloader, optimizer, epoch, device)
-        auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, 'target', device)
+        train.train(args.training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion, src_train_dataloader, tgt_train_dataloader, optimizer, epoch, device)
+        auprc = test.test(feature_extractor, class_classifier, domain_classifier, src_test_dataloader, tgt_test_dataloader, best_auprc, args.objective, device, class_criterion)
         if auprc > best_auprc:
             best_auprc = auprc
             print("Best AUPRC")
-            torch.save(feature_extractor.state_dict(), 'best_feature_extractor_wdgrl.pt')
-            torch.save(class_classifier.state_dict(), 'best_class_classifier_wdgrl.pt')
-            torch.save(domain_classifier.state_dict(), 'best_domain_classifier_wdgrl.pt')
+            torch.save(feature_extractor.state_dict(), 'best_feature_extractor_' + args.training_mode + '.pt')
+            torch.save(class_classifier.state_dict(), 'best_class_classifier_' + args.training_mode + '.pt')
+            if args.training_mode == 'dann':
+                torch.save(domain_classifier.state_dict(), 'best_domain_classifier.pt')
+            elif args.training_mode == 'wdgrl':
+                torch.save(critic.state_dict(), 'best_critic.pt')
             print("Saved Best Model")
 
         # Plot embeddings periodically.
         if epoch % params.embed_plot_epoch == 0 and params.fig_mode is not None:
             visualizePerformance(feature_extractor, class_classifier, domain_classifier, src_test_dataloader,
                                  tgt_test_dataloader, imgName='embedding_' + str(epoch))
-
-
 
 def parse_arguments(argv):
     """Command line parse."""
@@ -249,9 +257,13 @@ def parse_arguments(argv):
     parser.add_argument('--max_epoch', type=int, default=100, help='The max number of epochs.')
     parser.add_argument('--embed_plot_epoch', type= int, default=100, help= 'Epoch number of plotting embeddings.')
     parser.add_argument('--lr', type= float, default= 0.001, help= 'Learning rate.')
-    parser.add_argument('--upsample', type=int, default=3, help='Set frequency of sampling positive training example.')
+    parser.add_argument('--train_upsample', type=int, default=3, help='Set frequency of sampling positive training examples.')
+    parser.add_argument('--test_upsample', type=int, default=0, help='Set frequency of sampling positive testing examples.')
     parser.add_argument('--num_train', type=int, default=100000, help='Number of training examples per epoch.')
     parser.add_argument('--num_test', type=int, default=50000, help='Number of testing examples per epoch.')
+    parser.add_argument('--train_batch_size', type=int, default=1000, help='Set training mini-batch size.')
+    parser.add_argument('--test_batch_size', type=int, default=500, help='Set testing mini-batch size.')
+    parser.add_argument('--objective', default='source', help='Select source or target as the objective to maximize its AUPRC.')
 
     return parser.parse_args()
 

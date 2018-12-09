@@ -57,13 +57,13 @@ def get_train_loader(dataset):
 
     elif dataset == 'Human':
 
-        data = Human.Human(split = 'train', upsample = params.upsample, epoch_size = params.num_train)
-        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+        data = Human.Human(split = 'train', upsample = params.train_upsample, epoch_size = params.num_train)
+        dataloader = DataLoader(dataset = data, batch_size = params.train_batch_size, shuffle = False)
 
     elif dataset == 'Mouse':
 
-        data = Mouse.Mouse(split = 'train', upsample = params.upsample, epoch_size = params.num_train)
-        dataloader = DataLoader(dataset = data, batch_size = params.batch_size, shuffle = False)
+        data = Mouse.Mouse(split = 'train', upsample = params.train_upsample, epoch_size = params.num_train)
+        dataloader = DataLoader(dataset = data, batch_size = params.train_batch_size, shuffle = False)
 
     else:
         raise Exception('There is no dataset named {}'.format(str(dataset)))
@@ -116,13 +116,13 @@ def get_test_loader(dataset):
 
     elif dataset == 'Human':
 
-        data = Human.Human(split = 'test', upsample = params.upsample, epoch_size = params.num_test)
-        dataloader = DataLoader(dataset = data, batch_size = 500, shuffle = False)
+        data = Human.Human(split = 'test', upsample = params.test_upsample, epoch_size = params.num_test)
+        dataloader = DataLoader(dataset = data, batch_size = params.test_batch_size, shuffle = False)
 
     elif dataset == 'Mouse':
 
-        data = Mouse.Mouse(split = 'test', upsample = params.upsample, epoch_size = params.num_test)
-        dataloader = DataLoader(dataset = data, batch_size = 500, shuffle = False)
+        data = Mouse.Mouse(split = 'test', upsample = params.test_upsample, epoch_size = params.num_test)
+        dataloader = DataLoader(dataset = data, batch_size = params.test_batch_size, shuffle = False)
 
     else:
         raise Exception('There is no dataset named {}'.format(str(dataset)))
