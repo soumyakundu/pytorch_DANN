@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 import torch.nn.init as init
+import numpy as np
 
 class GradReverse(torch.autograd.Function):
     """
@@ -25,6 +26,90 @@ class Extractor(nn.Module):
 
     def __init__(self):
         super(Extractor, self).__init__()
+        self.conv1 = nn.Conv2d(4, 300, kernel_size=(1,19), padding=(0,9))
+        self.conv2 = nn.Conv2d(300, 200, kernel_size=(1,11), padding=(0,5))
+        self.conv3 = nn.Conv2d(200, 200, kernel_size=(1,7), padding=(0,3))
+        self.bn1 = nn.BatchNorm2d(300, eps=0.001, momentum=0.01)
+        self.bn2 = nn.BatchNorm2d(200, eps=0.001, momentum=0.01)
+        self.bn3 = nn.BatchNorm2d(200, eps=0.001, momentum=0.01)
+        self.max_pool1 = nn.MaxPool2d((1,3))
+        self.max_pool2 = nn.MaxPool2d((1,4))
+        self.relu = nn.ReLU()
+
+    def forward(self, input):
+        input = input.expand(input.data.shape[0], 4, 1, 1000)
+        x = self.max_pool1(self.relu(self.bn1(self.conv1(input))))
+        x = self.max_pool2(self.relu(self.bn2(self.conv2(x))))
+        x = self.max_pool2(self.relu(self.bn3(self.conv3(x))))
+        x = x.permute(0,2,3,1).contiguous()
+        x = x.view(-1, 4000)
+
+        return x
+
+class Class_classifier(nn.Module):
+
+    def __init__(self):
+        super(Class_classifier, self).__init__()
+        self.fc1 = nn.Linear(4000, 1000)
+        self.fc2 = nn.Linear(1000, 1000)
+        self.fc3 = nn.Linear(1000, 1)
+        self.bn4 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
+        self.bn5 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
+        self.dropout = nn.Dropout(p=0.3)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input):
+        logits = self.dropout(self.relu(self.bn4(self.fc1(input))))
+        logits = self.dropout(self.relu(self.bn5(self.fc2(logits))))
+        logits = self.fc3(logits)
+
+        return self.sigmoid(logits)
+
+class Domain_classifier(nn.Module):
+
+    def __init__(self):
+        super(Domain_classifier, self).__init__()
+        self.fc4 = nn.Linear(4000, 1000)
+        self.fc5 = nn.Linear(1000, 1000)
+        self.fc6 = nn.Linear(1000, 1)
+        self.bn6 = nn.BatchNorm1d(1000)
+        self.bn7 = nn.BatchNorm1d(1000)
+        self.dropout = nn.Dropout(p=0.3)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input, constant):
+        input = GradReverse.grad_reverse(input, constant)
+        logits = self.dropout(self.relu(self.fc4(input)))
+        logits = self.dropout(self.relu(self.fc5(logits)))
+        logits = self.fc6(logits)
+
+        return self.sigmoid(logits)
+
+class Critic(nn.Module):
+
+    def __init__(self):
+        super(Critic, self).__init__()
+        self.fc4 = nn.Linear(4000, 1000)
+        self.fc5 = nn.Linear(1000, 1000)
+        self.fc6 = nn.Linear(1000, 1)
+        self.bn6 = nn.BatchNorm1d(1000)
+        self.bn7 = nn.BatchNorm1d(1000)
+        self.dropout = nn.Dropout(p=0.3)
+        self.relu = nn.ReLU()
+
+    def forward(self, input):
+        logits = self.dropout(self.relu(self.fc4(input)))
+        logits = self.dropout(self.relu(self.fc5(logits)))
+        logits = self.fc6(logits)
+
+        return logits
+
+class Img_Extractor(nn.Module):
+
+    def __init__(self):
+        super(Img_Extractor, self).__init__()
         self.conv1 = nn.Conv2d(3, 32, kernel_size=5)
         self.conv2 = nn.Conv2d(32, 48, kernel_size=5)
         # self.conv1 = nn.Conv2d(3, 64, kernel_size= 5)
@@ -44,10 +129,10 @@ class Extractor(nn.Module):
 
         return x
 
-class Class_classifier(nn.Module):
+class Img_Class_classifier(nn.Module):
 
     def __init__(self):
-        super(Class_classifier, self).__init__()
+        super(Img_Class_classifier, self).__init__()
         # self.fc1 = nn.Linear(50 * 4 * 4, 100)
         # self.bn1 = nn.BatchNorm1d(100)
         # self.fc2 = nn.Linear(100, 100)
@@ -69,10 +154,10 @@ class Class_classifier(nn.Module):
 
         return F.log_softmax(logits, 1)
 
-class Domain_classifier(nn.Module):
+class Img_Domain_classifier(nn.Module):
 
     def __init__(self):
-        super(Domain_classifier, self).__init__()
+        super(Img_Domain_classifier, self).__init__()
         # self.fc1 = nn.Linear(50 * 4 * 4, 100)
         # self.bn1 = nn.BatchNorm1d(100)
         # self.fc2 = nn.Linear(100, 2)
@@ -87,8 +172,6 @@ class Domain_classifier(nn.Module):
         logits = F.log_softmax(self.fc2(logits), 1)
 
         return logits
-
-
 
 class SVHN_Extractor(nn.Module):
 

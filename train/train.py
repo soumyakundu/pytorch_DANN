@@ -1,90 +1,88 @@
 import torch
 from torch.autograd import Variable
 import numpy as np
-
 from train import params
 from util import utils
-
 import torch.optim as optim
+from torch.autograd import grad
 
 
-def train(training_mode, feature_extractor, class_classifier, domain_classifier, class_criterion, domain_criterion,
-          source_dataloader, target_dataloader, optimizer, epoch):
-    """
-    Execute target domain adaptation
-    :param training_mode:
-    :param feature_extractor:
-    :param class_classifier:
-    :param domain_classifier:
-    :param class_criterion:
-    :param domain_criterion:
-    :param source_dataloader:
-    :param target_dataloader:
-    :param optimizer:
-    :return:
-    """
+def gradient_penalty(critic, h_s, h_t, device):
+    alpha = torch.rand(h_s.size(0), 1).to(device)
+    differences = h_t - h_s
+    interpolates = h_s + (alpha * differences)
+    interpolates = torch.stack([interpolates, h_s, h_t]).requires_grad_()
 
-    # setup models
+    preds = critic(interpolates)
+    gradients = grad(preds, interpolates,
+                     grad_outputs=torch.ones_like(preds),
+                     retain_graph=True, create_graph=True)[0]
+    gradient_norm = gradients.norm(2, dim=1)
+    gradient_penalty = ((gradient_norm - 1)**2).mean()
+    return gradient_penalty
+
+def set_requires_grad(model, requires_grad=True):
+    for param in model.parameters():
+        param.requires_grad = requires_grad
+
+
+def train(training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion,
+          source_dataloader, target_dataloader, optimizer, epoch, device):
+
+    class_optim = optim.Adam([{'params': feature_extractor.parameters()},
+                              {'params': class_classifier.parameters()}], lr=0.0001)
+
+    critic_optim = optim.Adam(critic.parameters(), lr=0.0001)
+
     feature_extractor.train()
     class_classifier.train()
     domain_classifier.train()
 
-    # steps
     start_steps = epoch * len(source_dataloader)
     total_steps = params.epochs * len(source_dataloader)
 
     for batch_idx, (sdata, tdata) in enumerate(zip(source_dataloader, target_dataloader)):
 
         if training_mode == 'dann':
-            # setup hyperparameters
+
             p = float(batch_idx + start_steps) / total_steps
             constant = 2. / (1. + np.exp(-params.gamma * p)) - 1
 
-            # prepare the data
             input1, label1 = sdata
             input2, label2 = tdata
-            size = min((input1.shape[0], input2.shape[0]))
-            input1, label1 = input1[0:size, :, :, :], label1[0:size]
-            input2, label2 = input2[0:size, :, :, :], label2[0:size]
-            if params.use_gpu:
-                input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
-                input2, label2 = Variable(input2.cuda()), Variable(label2.cuda())
-            else:
-                input1, label1 = Variable(input1), Variable(label1)
-                input2, label2 = Variable(input2), Variable(label2)
 
-            # setup optimizer
-            optimizer = utils.optimizer_scheduler(optimizer, p)
+            label1 = label1.to(device)
+            label2 = label2.to(device)
+            input1 = input1.to(device)
+            input2 = input2.to(device)
+
+            source_labels = torch.zeros(label1.size()).type(torch.FloatTensor)
+            target_labels = torch.ones(label2.size()).type(torch.FloatTensor)
+
+            source_labels = source_labels.to(device)
+            target_labels = target_labels.to(device)
+
             optimizer.zero_grad()
 
-            # prepare domain labels
-            if params.use_gpu:
-                source_labels = Variable(torch.zeros((input1.size()[0])).type(torch.LongTensor).cuda())
-                target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor).cuda())
-            else:
-                source_labels = Variable(torch.zeros((input1.size()[0])).type(torch.LongTensor))
-                target_labels = Variable(torch.ones((input2.size()[0])).type(torch.LongTensor))
+            with torch.set_grad_enabled(True):
 
-            # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1)
-            tgt_feature = feature_extractor(input2)
+                src_feature = feature_extractor(input1)
+                tgt_feature = feature_extractor(input2)
 
-            # compute the class loss of src_feature
-            class_preds = class_classifier(src_feature)
-            class_loss = class_criterion(class_preds, label1)
+                class_preds = class_classifier(src_feature)
+                class_loss = class_criterion(class_preds, label1)
 
-            # compute the domain loss of src_feature and target_feature
-            tgt_preds = domain_classifier(tgt_feature, constant)
-            src_preds = domain_classifier(src_feature, constant)
-            tgt_loss = domain_criterion(tgt_preds, target_labels)
-            src_loss = domain_criterion(src_preds, source_labels)
-            domain_loss = tgt_loss + src_loss
+                tgt_preds = domain_classifier(tgt_feature, constant)
+                src_preds = domain_classifier(src_feature, constant)
 
-            loss = class_loss + params.theta * domain_loss
-            loss.backward()
-            optimizer.step()
+                tgt_loss = domain_criterion(tgt_preds, target_labels)
+                src_loss = domain_criterion(src_preds, source_labels)
+                domain_loss = tgt_loss + src_loss
 
-            # print loss
+                loss = class_loss + params.theta * domain_loss
+                loss.backward()
+                optimizer.step()
+
             if (batch_idx + 1) % 10 == 0:
                 print('[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tClass Loss: {:.6f}\tDomain Loss: {:.6f}'.format(
                     batch_idx * len(input2), len(target_dataloader.dataset),
@@ -92,32 +90,24 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                     domain_loss.item()
                 ))
 
-
         elif training_mode == 'source':
-            # prepare the data
+
             input1, label1 = sdata
-            size = input1.shape[0]
-            input1, label1 = input1[0:size, :, :, :], label1[0:size]
 
-            if params.use_gpu:
-                input1, label1 = Variable(input1.cuda()), Variable(label1.cuda())
-            else:
-                input1, label1 = Variable(input1), Variable(label1)
+            label1 = label1.to(device)
+            input1 = input1.to(device)
 
-            # setup optimizer
-            optimizer = optim.SGD(list(feature_extractor.parameters())+list(class_classifier.parameters()), lr=0.01, momentum=0.9)
+            optimizer.zero_grad()
 
-            # compute the output of source domain and target domain
-            src_feature = feature_extractor(input1)
+            with torch.set_grad_enabled(True):
 
-            # compute the class loss of src_feature
-            class_preds = class_classifier(src_feature)
-            class_loss = class_criterion(class_preds, label1)
+                src_feature = feature_extractor(input1)
+                class_preds = class_classifier(src_feature)
+                class_loss = class_criterion(class_preds, label1)
 
-            class_loss.backward()
-            optimizer.step()
+                class_loss.backward()
+                optimizer.step()
 
-            # print loss
             if (batch_idx + 1) % 10 == 0:
                 print('[{}/{} ({:.0f}%)]\tClass Loss: {:.6f}'.format(
                     batch_idx * len(input1), len(source_dataloader.dataset),
@@ -125,32 +115,84 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                 ))
 
         elif training_mode == 'target':
-            # prepare the data
+
             input2, label2 = tdata
-            size = input2.shape[0]
-            input2, label2 = input2[0:size, :, :, :], label2[0:size]
-            if params.use_gpu:
-                input2, label2 = Variable(input2.cuda()), Variable(label2.cuda())
-            else:
-                input2, label2 = Variable(input2), Variable(label2)
 
-            # setup optimizer
-            optimizer = optim.SGD(list(feature_extractor.parameters()) + list(class_classifier.parameters()), lr=0.01,
-                                  momentum=0.9)
+            label2 = label2.to(device)
+            input2 = input2.to(device)
 
-            # compute the output of source domain and target domain
-            tgt_feature = feature_extractor(input2)
+            optimizer.zero_grad()
 
-            # compute the class loss of src_feature
-            class_preds = class_classifier(tgt_feature)
-            class_loss = class_criterion(class_preds, label2)
+            with torch.set_grad_enabled(True):
 
-            class_loss.backward()
-            optimizer.step()
+                tgt_feature = feature_extractor(input2)
+                class_preds = class_classifier(tgt_feature)
+                class_loss = class_criterion(class_preds, label2)
 
-            # print loss
+                class_loss.backward()
+                optimizer.step()
+
             if (batch_idx + 1) % 10 == 0:
                 print('[{}/{} ({:.0f}%)]\tClass Loss: {:.6f}'.format(
                     batch_idx * len(input2), len(target_dataloader.dataset),
                     100. * batch_idx / len(target_dataloader), class_loss.item()
+                ))
+
+        elif training_mode == 'wdgrl':
+
+            input1, label1 = sdata
+            input2, label2 = tdata
+
+            label1 = label1.to(device)
+            label2 = label2.to(device)
+            input1 = input1.to(device)
+            input2 = input2.to(device)
+
+            source_labels = torch.zeros(label1.size()).type(torch.FloatTensor)
+            target_labels = torch.ones(label2.size()).type(torch.FloatTensor)
+
+            source_labels = source_labels.to(device)
+            target_labels = target_labels.to(device)
+
+            set_requires_grad(feature_extractor, requires_grad=False)
+            set_requires_grad(critic, requires_grad=True)
+
+            with torch.no_grad():
+                h_s = feature_extractor(input1)
+                h_t = feature_extractor(input2)
+
+            for i in range(5):
+                gp = gradient_penalty(critic, h_s, h_t, device)
+
+                critic_s = critic(h_s)
+                critic_t = critic(h_t)
+                wasserstein_distance = critic_s.mean() - critic_t.mean()
+
+                critic_cost = -wasserstein_distance + 10*gp
+                critic_optim.zero_grad()
+                critic_cost.backward()
+                critic_optim.step()
+
+            set_requires_grad(feature_extractor, requires_grad=True)
+            set_requires_grad(critic, requires_grad=False)
+
+            for i in range(10):
+
+                src_feature = feature_extractor(input1)
+                tgt_feature = feature_extractor(input2)
+
+                class_preds = class_classifier(src_feature)
+                class_loss = class_criterion(class_preds, label1)
+                wasserstein_distance = critic(src_feature).mean() - critic(tgt_feature).mean()
+
+                loss = class_loss + 0.1 * wasserstein_distance
+                class_optim.zero_grad()
+                loss.backward()
+                class_optim.step()
+
+            if (batch_idx + 1) % 10 == 0:
+                print('[{}/{} ({:.0f}%)]\tLoss: {:.6f}\tClass Loss: {:.6f}\tDomain Loss: {:.6f}'.format(
+                    batch_idx * len(input2), len(target_dataloader.dataset),
+                    100. * batch_idx / len(target_dataloader), loss.item() + critic_cost.item(), loss.item(),
+                    critic_cost.item()
                 ))
