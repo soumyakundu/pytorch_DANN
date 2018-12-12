@@ -13,7 +13,7 @@ class Human(Dataset):
         'test': '/srv/scratch/soumyak/inputs/human_liver_adult.test.bed'
     }
 
-    def __init__(self, split='train', transform=None, upsample=0, epoch_size=100000):
+    def __init__(self, split='train', transform=None, upsample=0, epoch_size=0):
         self.split = split
         self.transform = transform
         self.upsample = upsample
@@ -98,4 +98,7 @@ class Human(Dataset):
         return onehot, label
 
     def __len__(self):
-        return self.epoch_size
+        if self.epoch_size != 0:
+            return self.epoch_size
+        else:
+            return len(self.data.index)

@@ -5,7 +5,7 @@ from train import params
 from util import utils
 import torch.optim as optim
 from torch.autograd import grad
-
+from torch import nn
 
 def gradient_penalty(critic, h_s, h_t, device):
     alpha = torch.rand(h_s.size(0), 1).to(device)
@@ -27,16 +27,27 @@ def set_requires_grad(model, requires_grad=True):
 
 
 def train(training_mode, feature_extractor, class_classifier, domain_classifier, critic, class_criterion, domain_criterion,
-          source_dataloader, target_dataloader, optimizer, epoch, device):
-
-    class_optim = optim.Adam([{'params': feature_extractor.parameters()},
-                              {'params': class_classifier.parameters()}], lr=0.0001)
-
-    critic_optim = optim.Adam(critic.parameters(), lr=0.0001)
+          source_dataloader, target_dataloader, optimizer, epoch, device, feature_extractor2, class_classifier2):
 
     feature_extractor.train()
     class_classifier.train()
     domain_classifier.train()
+    critic.train()
+    #feature_extractor2.train()
+    #class_classifier2.train()
+
+    if training_mode == 'adda':
+        feature_extractor2.eval()
+        class_classifier2.eval()
+        set_requires_grad(feature_extractor2, requires_grad=False)
+        set_requires_grad(class_classifier2, requires_grad=False)
+
+    class_optim = optim.Adam([{'params': feature_extractor.parameters()},
+                              {'params': class_classifier.parameters()}], lr=0.0001)
+
+    critic_optim = optim.Adam(critic.parameters(), lr=0.001)
+    target_optim = optim.Adam(feature_extractor.parameters(), lr=0.001)
+    criterion = nn.BCEWithLogitsLoss()
 
     start_steps = epoch * len(source_dataloader)
     total_steps = params.epochs * len(source_dataloader)
@@ -46,7 +57,8 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
         if training_mode == 'dann':
 
             p = float(batch_idx + start_steps) / total_steps
-            constant = 2. / (1. + np.exp(-params.gamma * p)) - 1
+            #constant = 2. / (1. + np.exp(-params.gamma * p)) - 1
+            constant = 1
 
             input1, label1 = sdata
             input2, label2 = tdata
@@ -196,3 +208,48 @@ def train(training_mode, feature_extractor, class_classifier, domain_classifier,
                     100. * batch_idx / len(target_dataloader), loss.item() + critic_cost.item(), loss.item(),
                     critic_cost.item()
                 ))
+
+        elif training_mode == 'adda':
+
+            if batch_idx % 11 == 0:
+
+                set_requires_grad(feature_extractor, requires_grad=False)
+                set_requires_grad(critic, requires_grad=True)
+
+                input1, _ = sdata
+                input2, _ = tdata
+
+                input1, input2 = input1.to(device), input2.to(device)
+
+                source_features = feature_extractor2(input1)
+                target_features = feature_extractor(input2)
+
+                discriminator_x = torch.cat([source_features, target_features])
+                discriminator_y = torch.cat([torch.ones(input1.shape[0], device=device),
+                                             torch.zeros(input2.shape[0], device=device)])
+
+                preds = critic(discriminator_x).squeeze()
+                loss = criterion(preds, discriminator_y)
+
+                critic_optim.zero_grad()
+                loss.backward()
+                critic_optim.step()
+
+            else:
+
+                set_requires_grad(feature_extractor, requires_grad=True)
+                set_requires_grad(critic, requires_grad=False)
+
+                input2, _ = tdata
+                input2 = input2.to(device)
+                target_features = feature_extractor(input2)
+
+                discriminator_y = torch.ones(input2.shape[0], device=device)
+
+                preds = critic(target_features).squeeze()
+                loss = criterion(preds, discriminator_y)
+
+                target_optim.zero_grad()
+                loss.backward()
+                target_optim.step()
+

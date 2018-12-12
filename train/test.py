@@ -13,6 +13,7 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
     feature_extractor.eval()
     class_classifier.eval()
     domain_classifier.eval()
+
     source_correct = 0.0
     target_correct = 0.0
     domain_correct = 0.0
@@ -130,11 +131,16 @@ def test(feature_extractor, class_classifier, domain_classifier, source_dataload
 
     domain_correct = tgt_correct + src_correct
 
-    #source_labels = np.array(source_labels)
-    #source_preds = np.array(source_preds)
+    source_labels = np.array(source_labels)
+    source_preds = np.array(source_preds)
 
-    #source_labels = np.array([[i] for i in source_labels])
-    #source_preds = np.array([[i] for i in source_preds])
+    target_labels = np.array(target_labels)
+    target_preds = np.array(target_preds)
+
+    np.save('dann_mouse_source_labels.npy', source_labels)
+    np.save('dann_mouse_target_labels.npy', target_labels)
+    np.save('dann_mouse_source_preds.npy', source_preds)
+    np.save('dann_mouse_target_preds.npy', target_preds)
 
     source_auprc = average_precision_score(source_labels, source_preds)
     target_auprc = average_precision_score(target_labels, target_preds)

@@ -72,9 +72,11 @@ class Domain_classifier(nn.Module):
         super(Domain_classifier, self).__init__()
         self.fc4 = nn.Linear(4000, 1000)
         self.fc5 = nn.Linear(1000, 1000)
+        self.fc55 = nn.Linear(1000, 1000)
         self.fc6 = nn.Linear(1000, 1)
-        self.bn6 = nn.BatchNorm1d(1000)
-        self.bn7 = nn.BatchNorm1d(1000)
+        self.bn6 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
+        self.bn7 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
+        self.bn8 = nn.BatchNorm1d(1000, eps=0.001, momentum=0.01)
         self.dropout = nn.Dropout(p=0.3)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -83,6 +85,7 @@ class Domain_classifier(nn.Module):
         input = GradReverse.grad_reverse(input, constant)
         logits = self.dropout(self.relu(self.bn6(self.fc4(input))))
         logits = self.dropout(self.relu(self.bn7(self.fc5(logits))))
+        logits = self.dropout(self.relu(self.bn8(self.fc55(logits))))
         logits = self.fc6(logits)
 
         return self.sigmoid(logits)
@@ -92,8 +95,8 @@ class Critic(nn.Module):
     def __init__(self):
         super(Critic, self).__init__()
         self.fc4 = nn.Linear(4000, 1000)
-        self.fc5 = nn.Linear(1000, 1000)
-        self.fc6 = nn.Linear(1000, 1)
+        self.fc5 = nn.Linear(1000, 500)
+        self.fc6 = nn.Linear(500, 1)
         self.bn6 = nn.BatchNorm1d(1000)
         self.bn7 = nn.BatchNorm1d(1000)
         self.dropout = nn.Dropout(p=0.3)
@@ -102,6 +105,7 @@ class Critic(nn.Module):
     def forward(self, input):
         logits = self.dropout(self.relu(self.fc4(input)))
         logits = self.dropout(self.relu(self.fc5(logits)))
+        #logits = self.dropout(self.relu(self.fc55(logits)))
         logits = self.fc6(logits)
 
         return logits

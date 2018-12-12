@@ -32,14 +32,17 @@ save_dir = './experiment'
 extractor_dict = {'MNIST_MNIST_M': models.Img_Extractor(),
                   'SVHN_MNIST': models.SVHN_Extractor(),
                   'Human_Mouse': models.Extractor(),
+                  'Mouse_Human': models.Extractor(),
                   'SynDig_SVHN': models.SVHN_Extractor()}
 
 class_dict = {'MNIST_MNIST_M': models.Img_Class_classifier(),
               'SVHN_MNIST': models.SVHN_Class_classifier(),
               'Human_Mouse': models.Class_classifier(),
+              'Mouse_Human': models.Class_classifier(),
               'SynDig_SVHN': models.SVHN_Class_classifier()}
 
 domain_dict = {'MNIST_MNIST_M': models.Img_Domain_classifier(),
                'SVHN_MNIST': models.SVHN_Domain_classifier(),
                'Human_Mouse': models.Domain_classifier(),
+               'Mouse_Human': models.Domain_classifier(),
                'SynDig_SVHN': models.SVHN_Domain_classifier()}
